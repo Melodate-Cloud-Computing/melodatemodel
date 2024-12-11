@@ -31,7 +31,6 @@ general_pref = [
 ]
 
 music_pref = [
-    # Include all your music preference features as in the original code
     'genre_ballad', 'genre_blues', 'genre_classical', 'genre_country', 'genre_dangdut',
     'genre_edm', 'genre_edm (electronic dance music)', 'genre_hip-hop/rap', 'genre_indie/alternative',
     'genre_j-pop', 'genre_jazz', 'genre_k-pop', 'genre_metal', 'genre_pop', 'genre_pop indonesia',
@@ -49,12 +48,10 @@ music_pref = [
     'concert_no, i prefer not to attend concerts', 'concert_sometimes, depending on the artist or event', 'concert_yes, i love attending concerts'
 ]
 
-# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
 
-# Secure DATABASE_URL
 DATABASE_URL = os.getenv('DATABASE_URL')
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set in the environment variables")
@@ -83,7 +80,6 @@ def fetch_user_data():
 
         user_data = pd.read_sql_query(query, engine)
         
-        # Tambahkan prefix "user" ke kolom 'user'
         user_data['user'] = 'user' + user_data['user'].astype(str)
         return user_data
     except Exception as e:
@@ -92,28 +88,22 @@ def fetch_user_data():
 
 def find_similar_users(userid, preprocessed_df, user_data, top_n, user_gender):
     match_details = []
-
-    # Ambil data pengguna target
     try:
         user_vector = preprocessed_df.loc[userid].values.reshape(1, -1)
         target_gender = user_data[user_data['user'] == userid]['gender'].values[0].lower()
     except KeyError:
-        return None  # User not found
+        return None
 
-    # Hitung kemiripan kosinus dengan semua pengguna
     similarities = cosine_similarity(user_vector, preprocessed_df.values).flatten()
 
-    # Urutkan hasil berdasarkan kemiripan, kecuali diri sendiri
     similar_indices = similarities.argsort()[::-1]
-    similar_indices = [i for i in similar_indices if preprocessed_df.index[i] != userid][:top_n]  # Ganti dari username ke userid
+    similar_indices = [i for i in similar_indices if preprocessed_df.index[i] != userid][:top_n]
 
-    # Ambil detail pengguna serupa
     for index in similar_indices:
         matched_user = preprocessed_df.index[index]
         similarity_score = similarities[index]
         user_info = user_data[user_data['user'] == matched_user].iloc[0]
 
-        # Filter berdasarkan gender
         matched_gender = user_info['gender'].lower()
         if matched_gender == target_gender:
             continue
@@ -133,12 +123,10 @@ def get_recommendations():
     if not userid:
         return jsonify({'error': 'Userid parameter is required'}), 400
 
-    # Fetch user data
     user_data = fetch_user_data()
     if user_data is None:
         return jsonify({'error': 'Unable to fetch user data'}), 500
 
-    # Preprocess user data
     for col in cat_columns:
         user_data[col] = user_data[col].str.lower()
 
@@ -155,7 +143,6 @@ def get_recommendations():
     clusters = kmeans_model.predict(preprocessed_df[general_pref])
     preprocessed_df['cluster_label'] = clusters
 
-    # Ambil gender pengguna target
     try:
         user_gender = user_data[user_data['user'] == userid]['gender'].iloc[0]
     except IndexError:
@@ -169,21 +156,18 @@ def get_recommendations():
     if len(matches) == 0:
         return jsonify({'message': f"No similar users found for user '{userid}'"}), 200
 
-    # Extract user IDs and fetch complete user details
     user_ids = [match['user_id'] for match in matches]
     user_details = fetch_user_details(user_ids)
     if user_details is None:
         return jsonify({'error': 'Unable to fetch user details'}), 500
 
-    # Combine similarity scores with user details
     response_data = []
     for match in matches:
         user_data = user_details[user_details['user_id'] == match['user_id']].to_dict('records')
         if user_data:
-            user_info = user_data[0]  # Should only have one matching row
+            user_info = user_data[0] 
             user_info['similarity_score'] = match['similarity_score']
 
-            # Convert user_info to OrderedDict for maintaining the order
             ordered_user_info = OrderedDict()
             for column in user_details.columns:
                 ordered_user_info[column] = user_info.get(column)
@@ -216,7 +200,6 @@ def fetch_user_details(user_ids):
             """
         user_details = pd.read_sql_query(query, engine)
 
-        # Convert user_id to integer for consistency
         user_details['user_id'] = user_details['user_id'].astype(int)
         return user_details
     except Exception as e:
